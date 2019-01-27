@@ -1,0 +1,466 @@
+---
+title: 'Analysis on Value of Residential Homes in Ames, Iowa'
+author: 'Lingzhi Du, Gongting Peng, Xiaowen Zhang, Yue Lan'
+output:
+  pdf_document: 
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = T, comment = '')
+library(ggplot2)
+```
+
+```{r, results='hide', warning=F, message=F}
+source('LASSO_SELECTION.R')
+```
+
+
+\newpage
+
+# 1. Data Analysis
+
+## 1.1 Data Description
+
+> The data is a collection of basic housing information and sales record residential homes in Ames, Iowa sold in 2006-2010. It contains 1460 observations with 81 variables, including 23 nominal, 23 ordinal, 14 discrete, 19 continuous variables, a house ID, and the sale price of each house. The 79 explanatory variables can be summarized as follows.  
+
+| |Explanatory Variables|Data Type|
+|-|:--------|:--------|
+|*Overall*|OverallQual, OverallCond|Ordinal|
+|*Type/Style*|MSSubClass, BldgType, HouseStyle|Nominal|
+|*Location*|MSZoing, Neighborhood, Condition1, Condition2|Nominal|
+|*Lot*|LotFrontage, LotArea|Continuous|
+||LotShape, LandSlope|Ordinal|
+||Street, Alley, LandContour, LotConfig|Nominal|
+|*Utilities*|Utilities, HeatingQC, Electrical|Ordinal|
+||Heating, CentralAir|Nominal|
+|*Area*|1stFlrSF, 2ndFlrSF, LowQualFinSF, GrLivArea|Continuous|
+|*Year*|YearBuilt, YearRemodAdd|Discrete|
+|*Exterior*|RoofStyle, RoofMatl, Exterior1st, Exterior2nd, 
+||MasVnrType, Foundation|Nominal|
+||MasVnrArea|Continuous|
+||ExterQual, ExterCond|Ordinal|
+|*Interior*|BsmtFullBath, BsmtHalfBath, FullBath, HalfBath, 
+||Kitchen, Bedroom, Fireplaces, TotRmsAbvGrd|Discrete|
+||Functional, KitchenQual, FireplaceQu|Ordinal|
+|*Basement*|BsmtQual, BsmtCond, BsmtExposure, 
+||BsmtFinType1, BsmtFinType2|Ordinal|
+||BsmtFinSF1, BsmtFinSF2, BsmtUnfSF, TotalBsmtSF|Continuous|
+|*Garage*|GarageType|Nominal|
+||GarageYrBlt, GarageCars|Discrete|
+||GarageFinish, PavedDrive, GarageQual, GarageCond|Ordinal|
+||GarageArea|Continuous|
+|*Others*|OpenPorchSF, EnclosedPorch, 3SsnPorch, ScreenPorch, 
+||WoodDeckSF, PoolArea|Continuous|
+||PoolQC, Fence|Ordinal|
+|*Miscellaneous*|MiscFeature|Nominal|
+||MiscVal|Continuous|
+|*Sale*|MoSold, YrSold|Discrete|
+||SaleType, SaleCondition|Nominal|
+
+> The variables measure the physical attributes of the properties that a potential home buyer is concerned with. A majority of them are categorical variables that generally identify the type (nominal variables) of certain dwelling feature or evaluate the quality and condition (ordinal variables) of a specific aspect of the house. Discrete variables are often counts of particular items such as rooms or records of dates. Continuous variables typically quantify the area and dimensions for different attributes. Some of the explanatory variables highly correlates with another in nature by definition.  
+
+## 1.2 Data Pre-processing
+
+### 1.2.1 Data Types  
+
+> In accordance with data dictionary, nominal variables are loaded as factors, ordinal variables are loaded as ordered factors, and discrete and continuous varibles are loaded as vectors of integers.  
+  
+> Categorical data will be translated into dummy variables for each category when fitting models.   
+
+### 1.2.2 Response Variable
+
+> The response variable we focus on is the sale prices of houses. In the dataset, the values of responses run across different orders of magnitude, ranging from 34,900 to 755,000. The distribution of sale prices is right-skewed with a mean of 180,921.  
+    
+> ```{r, fig.width=4, fig.height=2.5, fig.align='left'}
+cat('Summary of SalePrice:\n')
+summary(housing$SalePrice)
+cat('Histogram of SalePrice:\n')
+par(cex=0.6, family='serif')
+hist(housing$SalePrice, main='', xlab='SalePrice', breaks=40, xlim=range(0,8e+05), ylim=range(0,250))
+```
+
+> The skewness and variability of data can be reduced by taking a log tranformation. After transformed into its logrithm, we can see that `SalePrice` displays a close pattern towards normal distribution with a quantile-quantile plot.  
+
+```{r, fig.height=3, fig.width=6, fig.align='center'}
+par(mfrow=c(1, 2), cex=0.6, family='serif')
+qqnorm(housing$SalePrice, main='')
+title(main='Q-Q Plot for response variable', adj=0)
+title(main='  SalePrice', adj=0, line=-1, font.main=1)
+qqnorm(log(housing$SalePrice), main='', ylab='')
+title(main='  log SalePrice', adj=0, line=-1, font.main=1)
+```
+
+> The nice feature of conformation to normality can help improve the fit of a linear model and correct violations of model assumptions such as nonconstant error variance. Therefore we will use the logrithm of sales price as the measurement of response variable when building up the model. A formal test of normality will be performed when diagnosing the model.  
+
+### 1.2.3 Missing Values
+
+* `NA` values  
+
+> A total of 19 variables have `NA` values in the data set, 15 of which are categorical data using `NA` to denote 'no such feature' and 4 have missing observations.  
+
+* `0`s that can be interpreted as missing values
+
+> For some numeric variables, a value of `0` may be an indicator of 'not applicable'. For example, a `GarageArea` of 0 is equivalent to not having a garage. If we are examining the effect of garage spaciousness on housing prices, the 0s can lead to an exaggaration of the corresponding parameter. We will treat these irrelevant 0s as missing values as well.  
+  
+> To deal with missing values in categorical data, a new level of `NA` is added to each of the factors.  
+> To deal with missing values in numeric values, we are adopting the mean imputation method. In this way, both sample size and sample mean maintain the same, and there is guaranteed to be no correlation between the imputed values and other variables. However, the imputation reduces the variability of the variables themselves as well as their covariances with other variables. The under-statement of variance may result in an under-estimate of p-value of the corresponding parameter estimator.  
+
+### 1.2.4 Dependence and Multi-colinearality
+
+* Overall evaluation variables
+
+> In the dataset there are two variables `OverallQual` and `OverallCond` that evaluate the quality and condition of the houses respectively in general. These variables are derived from the evaluation of other features and thus contain little information themselves. In addition, they are hard to interpret from an explanatory perspective.  Therefore we will not include them in the explanatory model.  
+
+* Exact multi-colinearality  
+
+> According to data dictionary, there are perfect linear relationships among certain variables. The above grade (ground) living area square feet `GrlivArea` is the sum of first floor square feet `X1stFlrSF`, second floor square feet `X2ndFlrSF`, and low quality finished square feet (all floors) `LowQualFinSF`; and the total square feet of basement area `TotalBsmtSF` is the sum of type 1 finished square feet `BsmtFinSF1`, type 2 finished square feet `BsmtFinSF2`, and unfinished square feet of basement area `BsmtUnfSF`. The data itself also gives that $Cor(GrlivArea, X1stFlrSF + X2ndFlrSF + LowQualFinSF) = 1$ and $Cor(TotalBsmtSF, BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF) = 1$.  
+  
+> To avoid exact multi-colinearality issue, we'll remove `GrLivArea` and `TotalBsmtSF` from the dataset.  
+
+* Other issues related to multi-colinearality
+
+> Most of the categorical data in the data set are highly imbalanced across different levels. It is often the case that a dominant category takes up more than 90% percent of the data and the scarse categories take up very small percetages. Here are some examples of extreme cases.  
+  
+> ```{r}
+summary(rawdata[,c('RoofMatl','Heating','Street','Utilities')])
+```
+
+> As these factors are reorganized into dummy variables, the vectors will be composed of generally all 1s for dominant categories and all 0s for minority categories, thus highly correlated with each other as well as with the intercept term. It will give rise to multi-colinearality issue.  
+
+> Meanwhile, the sparseness of the variables can boost the variance of corresponding parameter estimators and hence reduce the significance level. It is very likely that these variables will be eliminated from the model during the variable selection process. Therefore, we will keep them for now and revisit the issue when evaluating the final model.  
+
+## 1.3 Exploratory Analysis
+
+* Overall Evaluations:  
+
+> As aforementioned, there are two variables that evaluate the houses' overall qualities and conditions. They are directly associated with the sale prices.  
+  
+```{r, fig.width=6, fig.height=2.5, fig.align='center'}
+par(mfrow=c(1, 2), cex=0.6, family='serif')
+plot(y=log(rawData$SalePrice), x=rawData$OverallCond, ylab='log SalePrice', xlab='Overall Condition')
+title(main='Overall Evaluations', adj=0)
+plot(y=log(rawData$SalePrice), x=rawData$OverallQual, ylab='', xlab='Overall Quality')
+```
+
+> We can see from the above graph that there is a positive linear relationship between housing prices and each of the evaluation scores. The price in log scale generally goes up as the evaluation scores go up. Overall quality of a property is a stronger indicator of sale prices since the clearer trend suggests a higher correlation ($corr=`r cor(log(rawData$SalePrice), rawData$OverallQual)`$).  
+  
+* Impact of Area
+
+> Intuitively, area plays a key role in determining the price of property. Here is a plot that shows the relationships between sale prices and the main area statistics of houses.  
+
+```{r, fig.width=6, fig.height=5, fig.align='center'}
+par(mfrow=c(2, 2), cex=0.6, family='serif')
+plot(y=log(rawData$SalePrice), x=rawData$GrLivArea, ylab='log SalePrice', xlab='General Living Area')
+title(main='Impact of Area', adj=0)
+plot(y=log(rawData$SalePrice), x=rawData$LotArea, ylab='', xlab='Lot Area')
+rawData1 <- rawData[log(rawData$SalePrice)>10.6,]
+rawData1 <- rawData1[rawData1$LotArea<100000,]
+rawData1 <- rawData1[rawData1$GrLivArea<4000,]
+plot(y=log(rawData1$SalePrice), x=rawData1$GrLivArea, ylab='log SalePrice', xlab='General Living Area')
+title(main='Impact of Area (outliers removed)', adj=0)
+plot(y=log(rawData1$SalePrice), x=rawData1$LotArea, ylab='', xlab='Lot Area')
+```
+
+> With the plot, it is obvious that there are 4 outliers with significantly large areas and 5 outliers with implausible low sale prices. We can have a better view of the relationship between variables after removing these outliers.  
+  
+> We will use a formal statistical method to detect the outliers later during the model building process.  
+
+* Location and Neighborhood
+
+> Another intuition is that location is essential for the pricing of propertities. From the plot we can see that one zone or neighborhood can distinguish from another in terms of average housing prices.
+
+```{r, fig.width=6, fig.height=2.5, fig.align='center'}
+par(mfrow=c(1, 2), cex=0.6, family='serif')
+plot(y=log(rawData$SalePrice), x=rawData$MSZoning, ylab='log SalePrice', xlab='Zoning Classification')
+title(main='Location and Neighborhood', adj=0)
+plot(y=log(rawData$SalePrice), x=rawData$Neighborhood, ylab='', xlab='Neiborhood')
+```
+
+
+# 2. Explanatory Model
+
+## 2.1 Model Building
+
+### 2.1.1 Variable Selection with LASSO
+
+> Since post-selection inference for regression coefficients that conditions on model selection with LASSO has been proved to be valid, we will first adopt the LASSO model to preliminarily eliminate explanatory variables.  
+  
+> To reach for the best tuning parameter $\lambda$, we randomly split the data set into training set against test set and then apply a 5-fold cross-validation recursively for 10 times. Each time we get a best $\lambda$ corresponding to that random partition of training set and test set. The final best $\lambda$ is derived by taking the mean of the 10 $\lambda$s.  
+  
+    > $best \lambda = `r best.lambda`$  
+  
+> Note that the dataset after pre-processing procedures has 97 variables, which extend to 261 variables after re-organizing the categorical variables. With implementation of LASSO, the number of variables has shrinked significantly to 54 variables.  
+  
+> In the latter part of the report, we will refer to the model with 54 explanatory variables selected using LASSO as the full model.  
+
+### 2.1.2 Stepwise Feature Selection with ANOVA F-test and BIC
+
+* ANOVA F-test  
+
+> As we inspect the full model, we can observe the parameters with large p-value from the summary of the full model.  
+
+|Variables|Estimates|Std. Error|t value|p-value|siginificance|
+|:---|---:|---:|---:|---:|:---|
+|SaleTypeCon          |1.043e-01  |1.042e-01   |1.001 |0.316815||
+|OpenPorchSF          |1.248e-04  |6.394e-05   |1.952 |0.051141| .|
+|GarageArea           |1.240e-05  |3.254e-05   |0.381 |0.703219||
+|HeatingQC.L          |6.294e-02  |3.562e-02   |1.767 |0.077422| .|  
+|HeatingQC.Q         |-3.879e-03  |2.165e-02  |-0.179 |0.857786| |
+|BsmtExposure.L       |3.486e-03  |1.148e-02   |0.304 |0.761539| |
+|ExterCond.L          |5.663e-02  |3.568e-02   |1.587 |0.112717||
+|MasVnrArea           |4.705e-05  |2.556e-05   |1.840 |0.065912| .|  
+|NeighborhoodVeenker  |7.273e-02  |4.550e-02   |1.599 |0.110111||
+|StreetPave           |9.996e-02  |6.142e-02   |1.628 |0.103829||
+|MSZoningFV           |6.853e-02  |3.867e-02   |1.772 |0.076610| .|
+|KitchenQual.Q       |3.457e-02  |1.503e-02   |2.300 |0.021584| *| 
+|HeatingGasW         |7.993e-02  |3.675e-02   |2.175 |0.029813| *|  
+|RoofMatlMembran     |3.467e-01  |1.473e-01   |2.354 |0.018698| *| 
+  
+> With the identification of variables that have large or relatively large p-values, we will be performing ANOVA F-test to check these variables one by one to see if each of them has a significant impact on our model at a significance level of $\alpha=0.01$. We will start with testing the variable with the largest p-value in the current model, and consider removing it if the significance criteria is not met.  
+  
+> ```{r}
+anova(model0,model1)
+```
+  
+> As we can see in the summary above, the p-value for ANOVA F-test is 0.8578, which is greater than the set significent level of 0.01. There is not enough evidence to prove that `HeatingQC.Q` has an effect on `SalePrice`.
+Therefore, we remove this parameter from our full model and test our reduced model with the same approach.
+
+> After iterating this process for 13 times, we derive our final "best" model with every parameter having a significant impact on our regression model.  
+
+> ```{r}
+summary(model13)
+```
+  
+> By doing ANOVA F-test, we have further eliminated 13 variables from the full model. We are going to use an alternative approach, stepwise BIC, to find the "best" model and hopefully we can get the same "best" result.  
+
+* Stepwise BIC  
+
+> ```{r, error=T}
+BIC.Stepwise = step(model0,scope = ~MSSubClass50 + MSSubClass60 + MSSubClass70 + 
+     MSZoningFV + MSZoningRL + LotArea + StreetPave + LandContourHLS + 
+     LotConfigCulDSac + NeighborhoodBrkSide + NeighborhoodClearCr + 
+     NeighborhoodCrawfor + NeighborhoodNoRidge + NeighborhoodNridgHt + 
+     NeighborhoodSomerst + NeighborhoodStoneBr + NeighborhoodVeenker + 
+     YearRemodAdd + RoofMatlMembran + RoofMatlWdShngl + MasVnrArea + 
+     ExterQual.L + ExterCond.L + FoundationPConc + BsmtExposure.L + 
+     BsmtFinSF1 + HeatingGasW + HeatingQC.L + HeatingQC.Q + CentralAirTRUE + 
+     X1stFlrSF + X2ndFlrSF + BsmtFullBath + FullBath + HalfBath + 
+     KitchenQual.L + KitchenQual.Q + TotRmsAbvGrd + Functional.L + 
+     Fireplaces + GarageTypeAttchd + GarageCars + GarageArea + 
+     PavedDrive.L + WoodDeckSF + OpenPorchSF + ScreenPorch + PoolArea + 
+     SaleTypeCon + SaleTypeNew + SaleConditionNormal + ConditionNorm + 
+     ExteriorBrkFace, direction = "both", k = log(1460))
+```
+
+
+> As we can see from the result above, the model with the minimum AIC value of -5422.88 is eliminating the exact same 13 variables as the previous model is, which is the same as "model13" aka our "best" model in the anova F-test part.  
+
+>  Therefore, we got the same "best" model from ANOVA F-test and stepwise BIC.  
+
+### 2.1.3 Model Justification and Verification
+
+* Test for Normality  
+
+> Below is a plot of the standardized residuals:  
+
+```{r, fig.height=3, fig.width=3, fig.align='center'}
+par(cex=0.6, family='serif')
+qqnorm(std.residuals, main='')
+title(main='Q-Q Plot for residuals', adj=0)
+qqline(std.residuals, col= 'blue')
+```
+
+> As shown in the graph, the residuals are approximately normal around its mean. However, the distribution of residuals seems to have heavy tails on both ends.  
+  
+> To give a general conclusion, we are performing Kolmogorov-Smirnov to formally test the conformation of normality quantitatively. We are running the Kolmogorov-Smirnov test for 100 times and taking the mean of 100 results as the ks score.  
+  
+> After running the tests, we get a mean p-value of 0.002391308, which is below our chosen significance level. Therefore we reject the null hypothesis that the residuals are normally distributed.  
+  
+> Thus, we conclude that even though the residuals looks normally distributed in some ways, we fail to meet our assumptions according to the Kolmogorov-Smirnov test.
+
+* Influential Points and Outliers:
+
+```{r}
+ols_dffits_plot(best.Model)
+```
+
+
+> From the plot above, we can observe that there are many influential points and outliers that are shifting our model and causing the violation of normality assumption. These data points should be removed.  
+  
+> We use dffits to remove outliers. We set the dffits value bar to be $2 * sqrt(p/n)$, where p is the number of parameter in the dataset and n is number of observations in the dataset. In our case, the quantity of this bar is 0.3310424, so we remove all the observations who's dffits value exceeds this bar and fit a new full model with the updated dataset.
+
+* Updated ANOVA F-test
+
+> Since we are updating the data and full model, we need to re-fit our model.  
+
+|Variables|Estimates|Std. Error|t value|p-value|siginificance|
+|:---|---:|---:|---:|---:|:---|
+|NeighborhoodClearCr |4.555e-02  |2.542e-02   |1.792 |0.073407| .| 
+|RoofMatlWdShngl     |1.387e-01  |7.446e-02   |1.863 |0.062738| .| 
+|PoolArea            |4.486e-03  |1.835e-03   |2.444 |0.014658| *| 
+
+
+> After identifying the variables with relatively large p-value, we will re-run ANOVA F-test to check these variables one by one to see if each of them has a significant impact on our model at a significance level of $\alpha=0.01$.
+
+```{r}
+anova(model_new, model_new1)
+```
+
+
+> As we can see in the summary above, the p-value for anova F-test is 0.07341, which is greater than the chosen significent level of 0.01. Thus, there is not enough evidence to prove that `NeighborhoodClearCr` has an effect on SalePrice. Therefore, we will remove the variable from our new full model and test our new reduced model with the same approach.  
+
+> After iterating this process for 3 times, we identify our new best model with every parameter having significent impact on our new regression model.  
+
+```{r}
+summary(model_new3)
+```
+
+* Updated Stepwise BIC
+
+> We re-run stepwise BIC and again reach the same model as with the one derived from ANOVA F-test.  
+
+* Updated Test for Normality
+
+> To test the normality of our new best model, we calculate the standardized residual and then plot the qqplot of the standardized residuals
+
+```{r, fig.height=3, fig.width=3, fig.align='center'}
+par(cex=0.6, family='serif')
+qqnorm(std.residuals.new, main='')
+title(main='Q-Q Plot for residuals', adj=0)
+qqline(std.residuals.new, col= 'blue')
+```
+
+> As we can see above in the Normal Q-Q Plot, the residuals looks pretty straight and fit the diagnosis line much better.  
+  
+> To further test the normality quantitatively, we iterate the Kolmogorov-Smirnov test 100 times and take the mean of 100 ks scores as our final ks score, which in our case is 0.299033. Since the mean ks score we get is very large, the normality assumptions for the data are satisfied as we fail to reject the null hypothesis that the residuals are normally distributed.
+
+* Multi-colinearity Detection
+
+```{r}
+faraway::vif(lm)
+```
+
+> To detect any multi-colinearity issues in the model, we are calculating the variance inflation factors and using the rule of thumb as the criteria. None of the VIFs is going beyond 10. Thus, we believe there is no multi- collinearity among the variables in our model.
+
+* test for Nonlinearity:
+  + plot residuals against fitted Ys
+
+```{r, fig.height=3, fig.width=3, fig.align='center'}
+par(cex=0.6, family='serif')
+plot(x=best.model.new$fitted.values, y=best.model.new$residuals, main = '',
+     xlab='Fitted Values', ylab='Residuals')
+title(main='Residuals Plot', adj=0)
+```
+
+> The residuals plot shows the residuals have no specific trend versus fitted values, indicating that the linear association may be appropriate.  
+
+* test for constant variance:
+    + plot residuals against fitted Ys
+    + regress residuals on pairwise products of Xs, test stats: R^2
+    + transformation $y=\sqrt{|y|}$ stablizes the variance
+
+```{r, fig.height=3, fig.width=3, fig.align='center'}
+semistudentres = resid(best.model.new)/sqrt(mean(best.model.new$residuals^2))
+par(cex=0.6, family='serif')
+plot(x=best.model.new$fitted.values, y=semistudentres^2, main='',
+     xlab='Fitted Values', ylab='Residuals^2')
+title(main='Squared Residuals Plot', adj=0)
+```
+
+> The squared residuals plot shows that the deviation of the residuals does not increase as the fitted values increase, indicating no nonconstancy of error variance.  
+
+### 2.1.5 Finalizing Model
+
+> Here is a summary plot of the best model
+
+```{r}
+par(mfrow = c(2,2), cex=0.6, family='serif')
+plot(best.model.new)
+```
+
+
+## 2.2 Model Application - Morty's Case
+
+### 2.2.1 Selling Price Suggestion
+
+```{r, eval=F}
+setwd('~/Desktop')
+morty <- read.csv('mortyAfter.txt')
+exp(predict(best.model.new, morty, interval = 'predict'))
+```
+
+Based on the model we built above, the 95% confident interval of prediction of the price Morty can sell his house for is *(128004.1, 190518.2)*, with the expected price of *156156163.7*. 
+
+If Morty tries hard enough and he gets a brilliant agent, he can sell his house for *190518.2* because that is the upper limit for the confidence interval of prediction, which means *190518.2* is not unlikely at the significant level of 95%. 
+
+Things can happen if Morty tries hard enough! :) 
+
+
+### 2.2.2 Price Enhancement Proposal
+
+If Morty wants to sell his house for more, there are several things he can do to add value to this house based on the model:
+ + The first thing Morty should work on is his kitchen. His kithen is so bad that no one wants to even takes a look. That's even probably the reason why they want to sell the house. 
+ + The second one is to upgrade the material on the exterior, which can increase the expected value of the house a lot. 
+ + Thirdly, Morty shoudl considier reconstruct the whole house. It may sound too costly, but the return is `huge`. The house will gain tons of value if the construction is new. 
+ 
+Morty's house is of high value already because the house already has some of the most significant features that ganruantee the price of the house, for example the house has the Central air conditioning and regarding the functionality, the house also has a very good performance. 
+
+So, let's see what happens if Morty works his ass off and upgrade the house like expected, the price would be:
+
+```{r, eval=F}
+mortynew$KitchenQual.L  = 0.6708204
+mortynew$ExterQual.L = 1
+mortynew$SaleTypeNew = 1
+exp(predict(best.model.new, mortynew, interval = 'predict'))
+```
+
+Woo hoo! Now Morty is a very happy dude because after several changes, he can sell his house for *275909.6*! Morty has not seen that coming and now he truly believes the magic of data science and the power of experts. 
+
+You are welcome Morty. 
+
+
+
+# 3. Predictive Model
+
+## 3.1 Data Cleaning
+
+The data cleaning procedure for the predictive model should be different from the explanatory model. There are many quality features in the dataset and they are properly encoded as ordered factors in the explanatory model. However, this is quiet inefficient in the predictive point of view and brings a large loss of degree of freedom. Therefore we transform quality features to numerical scores (i.e. 'Excellent' to 5 and 'Poor' to 1), which is not a standard way to deal with categorical features but can lower MSPE.
+
+## 3.2 Feature Engineering
+
+In the explanatory model, Lasso is used to select variables. But the performence of Lasso to select variables is just fair and unstable. Sometimes it will drop variables that are valuable and increase MSPE. When n is large, we can drop variables in a more conservative way. In fact, for OLS we have
+$$E(MSE) \thickapprox \sigma^2(1+p/n)$$
+So even if we include a redundant variable it just increase MSE with $\sigma^2/n$. This is very small when $n$ is big enough. In Lasso and Ridge, penalty on coefficients makes it even safer to keep most variables.
+
+Therefore, instead of dropping variables aggressively with Lasso, we only drop a few categorical features that are highly uneven (most observations are in one category) and also not significant in t-test. Dropping these variables shows almost no influence on the cross validated MSPE but makes our model simpler and more stable.
+
+Interaction terms can be added to the model to capture the non-linear and interactive patterns of the data. It is impossible to test all possible interaction terms, so we choose four most important features *Total Area*, *Zoning Type*, *Overall Quality* and *Neighborhood*, and consider all possible combinations of their 2-order and 3-order interactions. These interaction terms are transformed into hundreds of dummy features. Perhaps most of them are not significant but it is impossible to test all the dummy features one by one. Fortunately, Lasso can shrink the trivial variables automatically and cross validation results show that adding interaction terms into the model dramatically decrease the MSPE, which once again proves that redundant variables are not that important for predictive models.
+
+Besides interaction terms, we create some features that may be useful in predicting housing price, e.g. average room area with total area divided by number of rooms. Some of them work and some of them don't. Features are only kept if they bring improvement to the CV result.
+
+## 3.3 Model Fitting
+
+We use glmnet to fit our model. We keep 30% of the total dataset as our validation data and the rest 70% as training data. Then we apply 10-fold cross validation within training data. We use the best lambda we get to fit a new model and apply it to the validation set to get the validation score. As the data is relatively small, validation results are quiet unstable, so we run the above process 5 times and take the average as our final result.
+
+The only parameter we need to tune is $\alpha$. We apply a simple grid search procedure to test $\alpha$ from 0 to 1 with step 0.1.
+
+## 3.4 Result
+
+The result is listed below.
+
+|$\alpha$|CV $MSPE$|*std*(CV)|Holdout $MSPE$|*std*(Holdout)|Holdout $\sqrt{MSPE}$ (Original Scale)|
+|:-:|:------:|:------:|:------:|:------:|:--------------:|
+|0|0.0192|0.0025|0.0152|0.0022|23527|
+|0.2|0.0175|0.0029|0.0139|0.0016|21756|
+|0.4|0.0206|0.0049|0.0139|0.0014|21539|
+|0.6|0.0178|0.0046|0.0137|0.0020|21399|
+|0.8|0.0170|0.0034|0.0135|0.0017|21374|
+|1.0|0.0190|0.0048|0.0139|0.0015|21598|
+
+According to the table, we get lowest CV and validation results when $\alpha=0.8$, although the MSPEs are stable for $\alpha>0.2$. Ridge regression performs significantly poorer than Lasso because we include hundreds of interaction terms in the model. Ridge does not do any variable selection therefore the p is large and the variance of the model is high, while Lasso and elastic net shrink unimportant features to zero.
+
+Note that although we have taken a 5-run-average, the result is still quiet unstable and may vary if we rerun the process. Outliers in the data dramatically influence the MSPE results in such a small dataset. Unfortunately we cannot drop outliers in holdout data otherwise the validation may not be correct (there are outliers in the real world).
+
+We get dramatical improvement by introducing interactions within only 4 features. There are potential improvements by introducing other interactions, but we have already seen how the dimension blows up by including interactions in linear models. In this case, tree-base models, which inherently consider interactions and non-linearity of the data, or neural network, which introduces interactions by stacking multiple layers of linear models, may be better choices to predict housing prices for this dataset.

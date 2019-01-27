@@ -1,0 +1,80 @@
+Variables,Description,Type,NAs,PreProcessing
+MSSubClass, Identifies the type of dwelling involved in the sale.,Categorical,0,factor
+MSZoning, Identifies the general zoning classification of the sale.,Categorical,0,
+LotFrontage, Linear feet of street connected to property,Int,259,NA->average
+LotArea, Lot size in square feet,Int,0,
+Street, Type of road access to property,Categorical,0,
+Alley, Type of alley access to property,Categorical,1369,add category NA
+LotShape, General shape of property,Ordered Categorical,0,order
+LandContour, Flatness of the property,Categorical,0,
+Utilities, Type of utilities available,Categorical,0,
+LotConfig, Lot configuration,Categorical,0,
+LandSlope, Slope of property,Ordered Categorical,0,order
+Neighborhood, Physical locations within Ames city limits,Categorical,0,
+Condition1, Proximity to various conditions,Categorical,0,[delete] ‘Norm’ take up more than 95%
+Condition2, Proximity to various conditions (if more than one is present),Categorical,0,[delete] ‘Norm’ take up more than 95%
+BldgType, Type of dwelling,Categorical,0,
+HouseStyle, Style of dwelling,Categorical,0,
+OverallQual, Rates the overall material and finish of the house,int,0,
+OverallCond, Rates the overall condition of the house,int,0,
+YearBuilt, Original construction date,int,0,
+YearRemodAdd, Remodel date (same as construction date if no remodeling or additions),int,0,
+RoofStyle, Type of roof,Categorical,0,
+RoofMatl, Roof material,Categorical,0,
+Exterior1st, Exterior covering on house,Categorical,0,combine?
+Exterior2nd, Exterior covering on house (if more than one material),Categorical,0,combine?
+MasVnrType, Masonry veneer type,Categorical,8,add category NA
+MasVnrArea, Masonry veneer area in square feet,int,8,NA->0
+ExterQual, Evaluates the quality of the material on the exterior ,Ordered Categorical,0,order
+ExterCond, Evaluates the present condition of the material on the exterior,Ordered Categorical,0,order
+Foundation, Type of foundation,Categorical,0,
+BsmtQual, Evaluates the height of the basement,Ordered Categorical,37,"can divide into ‘FA + TA’ Vs. ‘Gd+Ex’  ( 685:739, 37NA)"
+BsmtCond, Evaluates the general condition of the basement,Ordered Categorical,37,[delete] Garbage Var: TA takes up more than 90%
+BsmtExposure, Refers to walkout or garden level walls,Ordered Categorical,38,can be ‘No’ Vs. rest  (953:469)
+BsmtFinType1, Rating of basement finished area,Ordered Categorical,37,??? 
+BsmtFinSF1,Type 1 finished square feet,int,0,should turn to categorical: 0 takes more than 1/4
+BsmtFinType2, Rating of basement finished area (if multiple types),Ordered Categorical,38,[delete] mostly Unf
+BsmtFinSF2,Type 2 finished square feet,Ordered Categorical,0,[delete] 0 takes more than 95%
+BsmtUnfSF, Unfinished square feet of basement area,int,0,[delete] 0 takes more than 95%
+TotalBsmtSF, Total square feet of basement area,int,0,?
+Heating, Type of heating,Categorical,0,
+HeatingQC, Heating quality and condition,Ordered Categorical,0,order
+CentralAir, Central air conditioning,Logical,0,logical
+Electrical, Electrical system,Categorical,1,?
+1stFlrSF, First Floor square feet,int,0,
+2ndFlrSF, Second floor square feet,int,0,
+LowQualFinSF, Low quality finished square feet (all floors),int,0,
+GrLivArea, Above grade (ground) living area square feet,int,0,
+BsmtFullBath, Basement full bathrooms,int,0,
+BsmtHalfBath, Basement half bathrooms,int,0,
+FullBath, Full bathrooms above grade,int,0,
+HalfBath, Half baths above grade,int,0,
+Bedroom, Bedrooms above grade (does NOT include basement bedrooms),int,0,
+Kitchen, Kitchens above grade,int,0,
+KitchenQual, Kitchen quality,Ordered Categorical,0,order
+TotRmsAbvGrd, Total rooms above grade (does not include bathrooms),int,0,
+Functional, Home functionality (Assume typical unless deductions are warranted),Ordered Categorical,0,order
+Fireplaces, Number of fireplaces,int,0,
+FireplaceQu, Fireplace quality,Ordered Categorical,690,order
+GarageType, Garage location,Categorical,81,add category NA
+GarageYrBlt, Year garage was built,int,81,?
+GarageFinish, Interior finish of the garage,Ordered Categorical,81,order
+GarageCars, Size of garage in car capacity,int,0,
+GarageArea, Size of garage in square feet,int,0,
+GarageQual, Garage quality,Ordered Categorical,81,order
+GarageCond, Garage condition,Ordered Categorical,81,order
+PavedDrive, Paved driveway,Ordered Categorical,0,order
+WoodDeckSF, Wood deck area in square feet,int,0,
+OpenPorchSF, Open porch area in square feet,int,0,
+EnclosedPorch, Enclosed porch area in square feet,int,0,
+3SsnPorch, Three season porch area in square feet,int,0,
+ScreenPorch, Screen porch area in square feet,int,0,
+PoolArea, Pool area in square feet,int,0,
+PoolQC, Pool quality,Ordered Categorical,1453,order
+Fence, Fence quality,Categorical,1179,add category NA
+MiscFeature, Miscellaneous feature not covered in other categories,Categorical,1406,add category NA
+MiscVal, $Value of miscellaneous feature,int,0,
+MoSold, Month Sold (MM),int,0,
+YrSold, Year Sold (YYYY),int,0,
+SaleType, Type of sale,Categorical,0,
+SaleCondition, Condition of sale,Categorical,0,
