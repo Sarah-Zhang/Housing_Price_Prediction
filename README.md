@@ -25,4 +25,4 @@ The data contains 1460 observations with 79 variables, including a house ID and 
 
 ## Deliverable
 
-The [report]() is a complete demonstration of the discussion and summary of the prediction as well as evaluation.
+The [report](https://github.com/Sarah-Zhang/Housing_Price_Prediction/blob/master/Report.pdf) is a complete demonstration of the discussion and summary of the prediction as well as evaluation.
